@@ -9,3 +9,5 @@ Digital board hosts 4 (buffered) digital outputs. It is possible to increment ou
 A calibration keypad has also been drawn in order to make outputs calibration easier.
 
 This repository hosts PCB's Gerber files, BOMs, CPLs and arduino's sketches.
+
+https://www.instructables.com/MIDIXCV-MIDI-to-Multiple-Control-Voltages-Converte/
