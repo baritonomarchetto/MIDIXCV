@@ -45,6 +45,7 @@ mcp4728 dac1 = mcp4728(1); // initiate mcp4728 object, Device ID = 1
 #define KBTRACK 2
 #define OPEN 2500 //digital outs software-limited to 5V circa
 #define CLOSED 0
+#define LIMIT_CV //comment this to increase AUX outputs voltage to >5V
 
 //SDA pin: A4
 //SCL pin: A5
@@ -73,6 +74,7 @@ int pitchbend = 0;
 int noteOverflow;
 int velVal;
 int kbtVal;
+int ATVoltage;
 
 int noteMem[MAX_VOICES];
 
@@ -140,6 +142,7 @@ void setup(){
     MIDI.setHandleNoteOn(HandleNoteOn);
     MIDI.setHandleNoteOff(HandleNoteOff);
     MIDI.setHandlePitchBend(HandlePitchBend);
+    MIDI.setHandleAfterTouchChannel(HandleAfterTouch);
     //MIDI.setHandleControlChange(handleControlChange);
     MIDI.begin(MIDI_CHANNEL);
  //DAC initialization
@@ -172,18 +175,28 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
       break;
       case 1: //first note - same pitch to all outputs
         dac0.analogWrite(cv0IntRef[note] + pitchbend, cv1IntRef[note] + pitchbend, cv2IntRef[note] + pitchbend, cv3IntRef[note] + pitchbend);
-        velVal = velocity << 3;//note velocity (255->2040) VALUE SOFTWARE FORCED < 5V
-        kbtVal = note << 3;//keyboard tracking (255->2040) VALUE SOFTWARE FORCED < 5V
-        dac1.analogWrite(OPEN, velVal, kbtVal, 0);//open gate, velocity, keyboard tracking, (unused)
+        #ifdef LIMIT_CV
+          velVal = velocity << 3;//note velocity (255->2040)
+          kbtVal = note << 3;//keyboard tracking (255->2040)
+        #else
+          velVal = velocity << 4;//note velocity (255->4080)
+          kbtVal = note << 4;//keyboard tracking (255->4080)
+        #endif
+        dac1.analogWrite(OPEN, velVal, kbtVal, ATVoltage);//open gate, velocity, keyboard tracking, aftertouch
         for (int a = 0; a < MAX_VOICES; a++){
           noteMem[a] = note;
         }
         lowestNote = note;
       break;
         case 2:
-          velVal = velocity << 3;//note velocity (255->2040) VALUE SOFTWARE FORCED < 5V
-          kbtVal = note << 3;//keyboard tracking VALUE SOFTWARE FORCED < 5V
-          dac1.analogWrite(CLOSED, velVal, kbtVal, 0); //close gate (will be opened back soon), velocity, keyboard tracking, (unused)
+          #ifdef LIMIT_CV
+            velVal = velocity << 3;//note velocity (255->2040)
+            kbtVal = note << 3;//keyboard tracking (255->2040)
+          #else
+            velVal = velocity << 4;//note velocity (255->4080)
+            kbtVal = note << 4;//keyboard tracking (255->4080)
+          #endif
+          dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
           dac0.analogWrite(2, cv2IntRef[note] + pitchbend); //new pitch to latest two voices
           noteMem[2] = note;
           dac0.analogWrite(3, cv3IntRef[note] + pitchbend); //new pitch to latest two voices
@@ -192,27 +205,42 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
           NoteLowest();
         break;
         case 3:
-          velVal = velocity << 3;//note velocity (255->2040) VALUE SOFTWARE FORCED < 5V
-          kbtVal = note << 3;//keyboard tracking VALUE SOFTWARE FORCED < 5V
-          dac1.analogWrite(CLOSED, velVal, kbtVal, 0); //close gate (will be opened back soon), velocity, keyboard tracking, (unused)
+          #ifdef LIMIT_CV
+            velVal = velocity << 3;//note velocity (255->2040)
+            kbtVal = note << 3;//keyboard tracking (255->2040)
+          #else
+            velVal = velocity << 4;//note velocity (255->4080)
+            kbtVal = note << 4;//keyboard tracking (255->4080)
+          #endif
+          dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
           dac0.analogWrite(1, cv1IntRef[note] + pitchbend);//third voice stolen from the first doubled voice
           noteMem[1] = note;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
         case 4:
-          velVal = velocity << 3;//note velocity (255->2040) VALUE SOFTWARE FORCED < 5V
-          kbtVal = note << 3;//keyboard tracking VALUE SOFTWARE FORCED < 5V
-          dac1.analogWrite(CLOSED, velVal, kbtVal, 0); //close gate (will be opened back soon), velocity, keyboard tracking, (unused)
+          #ifdef LIMIT_CV
+            velVal = velocity << 3;//note velocity (255->2040)
+            kbtVal = note << 3;//keyboard tracking (255->2040)
+          #else
+            velVal = velocity << 4;//note velocity (255->4080)
+            kbtVal = note << 4;//keyboard tracking (255->4080)
+          #endif
+          dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
           dac0.analogWrite(3, cv3IntRef[note] + pitchbend);//fourth voice stolen from the second doubled voice
           noteMem[3] = note;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
         default: //POLYPHONY EXCEEDED (MAX_VOICES+ notes)
-          velVal = velocity << 3;//note velocity (255->2040) VALUE SOFTWARE FORCED < 5V
-          kbtVal = note << 3;//keyboard tracking VALUE SOFTWARE FORCED < 5V
-          dac1.analogWrite(CLOSED, velVal, kbtVal, 0); //close gate (will be opened back soon), velocity, keyboard tracking, (unused)
+          #ifdef LIMIT_CV
+            velVal = velocity << 3;//note velocity (255->2040)
+            kbtVal = note << 3;//keyboard tracking (255->2040)
+          #else
+            velVal = velocity << 4;//note velocity (255->4080)
+            kbtVal = note << 4;//keyboard tracking (255->4080)
+          #endif
+          dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
           for (int a = 0; a < MAX_VOICES; a++){
             if (noteMem[a] == lowestNote){ //search for the LOWEST pitch
               noteMem[a] = note; //steal the lowest note for the 4+ note
@@ -285,6 +313,15 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
 void HandlePitchBend(byte channel, int bend){
   pitchbend = bend>>4;
   dac0.analogWrite(cv0IntRef[noteMem[0]] + pitchbend, cv1IntRef[noteMem[1]] + pitchbend, cv2IntRef[noteMem[2]] + pitchbend, cv3IntRef[noteMem[3]] + pitchbend);
+}
+
+void HandleAfterTouch(byte channel, byte pressure){
+  #ifdef LIMIT_CV
+    ATVoltage = pressure << 3;// 255->2040
+  #else
+    ATVoltage = pressure << 4;// 255->4080
+  #endif
+  dac1.analogWrite(3, ATVoltage);
 }
 
 void NoteLowest(){
