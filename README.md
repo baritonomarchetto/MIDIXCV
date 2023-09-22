@@ -12,7 +12,6 @@ This repository hosts PCB's Gerber files, BOMs, CPLs and arduino's sketches.
 
 https://www.instructables.com/MIDIXCV-MIDI-to-Multiple-Control-Voltages-Converte/
 
-
 ACKNOWLEDGMENTS
 Manufacturing of FR-4 PCBs, aluminum face-plate and SMD assembly where sponsored by JLCPCB (https://jlcpcb.com/IAT).
 
