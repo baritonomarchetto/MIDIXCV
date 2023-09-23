@@ -68,8 +68,8 @@ bool DIP3State;
 MIDI_CREATE_DEFAULT_INSTANCE();
 
 int noteCount;
-int activeSlot;
-int lowestNote;
+byte lowestNote;
+byte highestNote;
 int pitchbend = 0;
 int noteOverflow;
 int velVal;
@@ -257,14 +257,14 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
                 case 3:
                   dac0.analogWrite(3, cv3IntRef[note] + pitchbend);
                 break;
-              }
+              }//switch close
             }
           }
           NoteLowest();
           noteCount = MAX_VOICES;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
         break;
-      }
+      }//switch close
     }
 }
 
@@ -276,37 +276,39 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
   note = note-MIDIOFFSET;
   if(note < MAX_INT_V){  
     switch (noteCount){ 
-      case 0://close gate out (common between unison and poly mode)
+      case 0://close gate out
         dac1.analogWrite(GATE, CLOSED);
       break;
       default:
-        for (int a = 0; a < MAX_VOICES; a++){ //search for an active pitch
-          if (noteMem[a] != note){
-            activeSlot = a;
-          }
-        }
-        for (int b = 0; b < MAX_VOICES; b++){ //search for the pitches to be updated
+        for (int b = 0; b < MAX_VOICES; b++){ //search for the pitch to be reallocated
           if (noteMem[b] == note){
-            noteMem[b] = noteMem[activeSlot]; //... and store it
+            //we reallocate the lost voice to the highest active pitch for a fatter high end
+            highestNote = 0;//reset
+            for (int a = 0; a < MAX_VOICES; a++){
+              if(noteMem[a] != noteMem[b] && noteMem[a] > highestNote){
+                 highestNote = noteMem[a];
+              }
+            }
+            noteMem[b] = highestNote; //...store it...
             switch(b){ //...set the new V out...
                 case 0:
-                  dac0.analogWrite(0, cv0IntRef[noteMem[activeSlot]] + pitchbend);
+                  dac0.analogWrite(0, cv0IntRef[highestNote] + pitchbend);
                 break;
                 case 1:
-                  dac0.analogWrite(1, cv1IntRef[noteMem[activeSlot]] + pitchbend);
+                  dac0.analogWrite(1, cv1IntRef[highestNote] + pitchbend);
                 break;
                 case 2:
-                  dac0.analogWrite(2, cv2IntRef[noteMem[activeSlot]] + pitchbend);
+                  dac0.analogWrite(2, cv2IntRef[highestNote] + pitchbend);
                 break;
                 case 3:
-                  dac0.analogWrite(3, cv3IntRef[noteMem[activeSlot]] + pitchbend);
+                  dac0.analogWrite(3, cv3IntRef[highestNote] + pitchbend);
                 break;
-              }
+              }//switch close
             NoteLowest(); // redefine notes height     
           }
         }
       break;
-     }//switch close
+    }//switch close
   }
 }
 
