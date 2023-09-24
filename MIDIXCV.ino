@@ -77,7 +77,8 @@ int velVal;
 int kbtVal;
 int ATVoltage;
 
-int noteMem[MAX_VOICES];
+byte noteMem[MAX_VOICES];
+bool busy[MAX_VOICES];
 
 // DAC's V/semitone tabulated values (mV), output #1
 const int cv0IntRef[MAX_INT_V] = {
@@ -169,15 +170,15 @@ void setup(){
 void HandleNoteOn(byte channel, byte note, byte velocity) {
   noteCount++;
   note = note-MIDIOFFSET;
-  if(note < MAX_INT_V){
+  if(note < MAX_INT_V && note>=0){
     switch (noteCount){
       case 0:
       //do nothing
       break;
-      case 1: //first note - same pitch to all outputs
-        dac0.analogWrite(cv0IntRef[note] + pitchbend, cv1IntRef[note] + pitchbend, cv2IntRef[note] + pitchbend, cv3IntRef[note] + pitchbend);
+      case 1: //first key press - same pitch to all outputs
         for (int a = 0; a < MAX_VOICES; a++){
           noteMem[a] = note;
+          busy[a] = true;
         }
         #ifdef LIMIT_CV
           velVal = velocity << 3;//note velocity (255->2040)
@@ -198,10 +199,11 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
             kbtVal = note << 4;//keyboard tracking (255->4080)
           #endif
           dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
-          dac0.analogWrite(2, cv2IntRef[note] + pitchbend); //new pitch to latest two voices
+          //new pitch to the latest two voices. We write all notes because the note-off routine is a game changer.
           noteMem[2] = note;
-          dac0.analogWrite(3, cv3IntRef[note] + pitchbend); //new pitch to latest two voices
+          busy[2] = true;
           noteMem[3] = note;
+          busy[3] = true;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
@@ -214,8 +216,9 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
             kbtVal = note << 4;//keyboard tracking (255->4080)
           #endif
           dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
-          dac0.analogWrite(1, cv1IntRef[note] + pitchbend);//third voice stolen from the first doubled voice
+          //third voice stolen from the first doubled voice
           noteMem[1] = note;
+          busy[1] = true;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
@@ -228,8 +231,9 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
             kbtVal = note << 4;//keyboard tracking (255->4080)
           #endif
           dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
-          dac0.analogWrite(3, cv3IntRef[note] + pitchbend);//fourth voice stolen from the second doubled voice
+          //fourth voice stolen from the second doubled voice
           noteMem[3] = note;
+          busy[3] = true;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
@@ -246,22 +250,23 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
             if (noteMem[n] == lowestNote){ //search for the LOWEST pitch and steal the lowest note for the 4+ note
               switch(n){
                 case 0:
-                  dac0.analogWrite(0, cv0IntRef[note] + pitchbend);
                   noteMem[0] = note;
+                  busy[0] = true;
                 break;
                 case 1:
-                  dac0.analogWrite(1, cv1IntRef[note] + pitchbend);
                   noteMem[1] = note;
+                  busy[1] = true;
                 break;
                 case 2:
-                  dac0.analogWrite(2, cv2IntRef[note] + pitchbend);
                   noteMem[2] = note;
+                  busy[2] = true;
                 break;
                 case 3:
-                  dac0.analogWrite(3, cv3IntRef[note] + pitchbend);
                   noteMem[3] = note;
+                  busy[3] = true;
                 break;
               }//switch close
+              //DAC_0_UPDATE(); //update dac
             }
           }
           NoteLowest();
@@ -270,6 +275,7 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
         break;
       }//switch close
     }
+    dac0.analogWrite(cv0IntRef[noteMem[0]] + pitchbend, cv1IntRef[noteMem[1]] + pitchbend, cv2IntRef[noteMem[2]] + pitchbend, cv3IntRef[noteMem[3]] + pitchbend);
 }
 
 void HandleNoteOff(byte channel, byte note, byte velocity) {
@@ -278,55 +284,98 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
     noteCount = 0;
   }
   note = note-MIDIOFFSET;
-  if(note < MAX_INT_V){  
+  if(note < MAX_INT_V && note>=0){
+    for (int a = 0; a < MAX_VOICES; a++){ //define which voice is going and needs reallocation
+      if (noteMem[a] == note){
+        busy[a] = false;
+      }
+    }
     switch (noteCount){ 
-      case 0://close gate out
+      case 0: //close gate out
         dac1.analogWrite(GATE, CLOSED);
       break;
-      default:
-        for (int a = 0; a < MAX_VOICES; a++){ //search for an active pitch
-          if (noteMem[a] != note){
-            activeSlot = a;
+      case 1: //2->1 all pitches the same
+        for (int a = 0; a < MAX_VOICES; a++){
+          if(busy[a]== false){
+            switch(a){
+              case 0:
+                noteMem[a] = noteMem[2];
+                busy[a] = true;
+              break;
+              case 1:
+                noteMem[a] = noteMem[2];
+                busy[a] = true;
+              break;
+              case 2:
+                noteMem[a] = noteMem[0];
+                busy[a] = true;
+              break;
+              case 3:
+                noteMem[a] = noteMem[0];
+                busy[a] = true;
+              break;
+            }//switch close
           }
         }
-        for (int b = 0; b < MAX_VOICES; b++){ //search for pitch/pitches to be reallocated
-          if (noteMem[b] == note){
-            
-            /* not working
-            highestNote = 0;//reset
-            for (int a = 0; a < MAX_VOICES; a++){
-              if(noteMem[a] != note && noteMem[a] > highestNote){
-                 highestNote = noteMem[a]; //we reallocate the lost voice to the highest active pitch for a fatter high end
-              }
-            }*/
-            switch(b){ //...set the new V out...
-                case 0:
-                  dac0.analogWrite(0, cv0IntRef[noteMem[activeSlot]] + pitchbend);
-                  noteMem[0] = noteMem[activeSlot]; //...store it...
-                break;
-                case 1:
-                  dac0.analogWrite(1, cv1IntRef[noteMem[activeSlot]] + pitchbend);
-                  noteMem[1] = noteMem[activeSlot]; //...store it...
-                break;
-                case 2:
-                  dac0.analogWrite(2, cv2IntRef[noteMem[activeSlot]] + pitchbend);
-                  noteMem[2] = noteMem[activeSlot]; //...store it...
-                break;
-                case 3:
-                  dac0.analogWrite(3, cv3IntRef[noteMem[activeSlot]] + pitchbend);
-                  noteMem[3] = noteMem[activeSlot]; //...store it...
-                break;
-              }//switch close
-            NoteLowest(); // redefine notes height     
+      break;
+      case 2: //3->2 pitches are coupled
+        for (int a = 0; a < MAX_VOICES; a++){
+          if(busy[a] == false){ //reallocate this voice...
+            switch(a){
+              case 0:
+                noteMem[a] = noteMem[1];
+                busy[a] = true;
+              break;
+              case 1:
+                noteMem[a] = noteMem[0];
+                busy[a] = true;
+              break;
+              case 2:
+                noteMem[a] = noteMem[1];
+                noteMem[1] = noteMem[0];
+                busy[a] = true;
+              break;
+              case 3:
+                noteMem[a] = noteMem[2];
+                busy[a] = true;
+              break;
+            }//switch close
+          }
+        }
+      break;
+      case 3: //4->3 reallocate a single voice to pitch #2
+        for (int a = 0; a < MAX_VOICES; a++){
+          if(busy[a] == false){ //reallocate this voice...
+            switch(a){
+              case 0:
+                noteMem[a] = noteMem[3];
+                noteMem[3] = noteMem[2];
+                busy[a] = true;
+              break;
+              case 1:
+                noteMem[a] = noteMem[3];
+                noteMem[3] = noteMem[2];
+                busy[a] = true;
+              break;
+              case 2:
+                noteMem[a] = noteMem[3];
+                busy[a] = true;
+              break;
+              case 3:
+                noteMem[a] = noteMem[2];
+                busy[a] = true;
+              break;
+            }//switch close
           }
         }
       break;
     }//switch close
   }
+  dac0.analogWrite(cv0IntRef[noteMem[0]] + pitchbend, cv1IntRef[noteMem[1]] + pitchbend, cv2IntRef[noteMem[2]] + pitchbend, cv3IntRef[noteMem[3]] + pitchbend);
 }
 
 void HandlePitchBend(byte channel, int bend){
-  pitchbend = bend>>4;
+  pitchbend = bend>>6;
   dac0.analogWrite(cv0IntRef[noteMem[0]] + pitchbend, cv1IntRef[noteMem[1]] + pitchbend, cv2IntRef[noteMem[2]] + pitchbend, cv3IntRef[noteMem[3]] + pitchbend);
 }
 
