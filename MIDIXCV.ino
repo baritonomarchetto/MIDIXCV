@@ -216,9 +216,11 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
             kbtVal = note << 4;//keyboard tracking (255->4080)
           #endif
           dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
-          //third voice stolen from the first doubled voice
+          //third voice stolen from the first doubled voice, and doubled for a fatter high end
           noteMem[1] = note;
+          noteMem[2] = note;
           busy[1] = true;
+          busy[2] = true;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
@@ -232,8 +234,8 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
           #endif
           dac1.analogWrite(CLOSED, velVal, kbtVal, ATVoltage); //close gate (will be opened back soon), velocity, keyboard tracking, aftertouch
           //fourth voice stolen from the second doubled voice
-          noteMem[3] = note;
-          busy[3] = true;
+          noteMem[2] = note;
+          busy[2] = true;
           dac1.analogWrite(GATE, OPEN); //GATE 1 OPEN to complete the retrigger routine
           NoteLowest();
         break;
@@ -324,19 +326,22 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
             switch(a){
               case 0:
                 noteMem[a] = noteMem[1];
+                noteMem[2] = noteMem[3];
                 busy[a] = true;
               break;
               case 1:
                 noteMem[a] = noteMem[0];
+                noteMem[2] = noteMem[3];
                 busy[a] = true;
               break;
               case 2:
-                noteMem[a] = noteMem[1];
+                noteMem[a] = noteMem[3];
                 noteMem[1] = noteMem[0];
                 busy[a] = true;
               break;
               case 3:
                 noteMem[a] = noteMem[2];
+                noteMem[1] = noteMem[0];
                 busy[a] = true;
               break;
             }//switch close
@@ -348,21 +353,21 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
           if(busy[a] == false){ //reallocate this voice...
             switch(a){
               case 0:
-                noteMem[a] = noteMem[3];
-                noteMem[3] = noteMem[2];
+                noteMem[a] = noteMem[2];
+                noteMem[2] = noteMem[1];
                 busy[a] = true;
               break;
               case 1:
-                noteMem[a] = noteMem[3];
-                noteMem[3] = noteMem[2];
+                noteMem[a] = noteMem[2];
                 busy[a] = true;
               break;
               case 2:
-                noteMem[a] = noteMem[3];
+                noteMem[a] = noteMem[1];
                 busy[a] = true;
               break;
               case 3:
                 noteMem[a] = noteMem[2];
+                noteMem[2] = noteMem[1];
                 busy[a] = true;
               break;
             }//switch close
@@ -393,6 +398,15 @@ void NoteLowest(){
   for (int a = 0; a < MAX_VOICES; a++){
     if(noteMem[a] < lowestNote){
        lowestNote = noteMem[a];
+    }
+  }
+}
+
+void NoteHighest(){
+  highestNote = 0;//reset
+  for (int a = 0; a < MAX_VOICES; a++){
+    if(noteMem[a] > highestNote){
+       highestNote = noteMem[a];
     }
   }
 }
