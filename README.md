@@ -10,6 +10,8 @@ A calibration keypad has also been drawn in order to make outputs calibration ea
 
 This repository hosts PCB's Gerber files, BOMs, CPLs and arduino's sketches.
 
+More info at the following link:
+
 https://www.instructables.com/MIDIXCV-MIDI-to-Multiple-Control-Voltages-Converte/
 
 ACKNOWLEDGMENTS
