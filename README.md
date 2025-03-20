@@ -10,12 +10,10 @@ A calibration keypad has also been drawn in order to make outputs calibration ea
 
 This repository hosts PCB's Gerber files, BOMs, CPLs and arduino's sketches.
 
-More info at the following link:
-
-https://www.instructables.com/MIDIXCV-MIDI-to-Multiple-Control-Voltages-Converte/
+More info on the [dedicated Instructable](https://www.instructables.com/MIDIXCV-MIDI-to-Multiple-Control-Voltages-Converte/).
 
 ACKNOWLEDGMENTS
-Manufacturing of FR-4 PCBs, aluminum face-plate and SMD assembly where sponsored by JLCPCB (https://jlcpcb.com/IAT).
+Manufacturing of FR-4 PCBs, aluminum face-plate and SMD assembly where sponsored by [JLCPCB](https://jlcpcb.com/IAT).
 
 JLCPCB is a high-tech manufacturer specialized in the production of high-reliable and cost-effective PCBs.They offer a flexible PCB assembly service with a huge library of more than 350.000 components in stock (included the MCP4728 needed for this project).
 
