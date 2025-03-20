@@ -173,19 +173,19 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
       case 0:
         //do nothing (not going to happen on "note on" signal)
       break;
-      case 1: //first key press - note allocated to 2x voices
-        AllocVoice(note, true);
+      case 1: //first key press - note allocated to 2x voices (not ALL voices or the volume drop during reallocation will be sensible)
+        AllocVoice(note, true); //we reserve only one slot to voice2
         AllocVoice(note, false);
       break;
       case 2: //new note allocated to 2x voices
-        AllocVoice(note, true);
+        AllocVoice(note, true); //we reserve only one slot to voice2
         AllocVoice(note, false);
       break;
       case 3:  //third voice allocated to 1x voice
-        AllocVoice(note, true);
+        AllocVoice(note, true); //we reserve one slot to voice3
       break;
       case 4: //fourth voice allocated to 1x voice
-        AllocVoice(note, true);
+        AllocVoice(note, true); //we reserve one slot to voice3
         NoteHighest();
       break;
       default: //POLYPHONY EXCEEDED (MAX_VOICES+ notes)
