@@ -53,10 +53,10 @@ const byte LDAC0 = 2;
 //const byte LDAC2 = 4;
 //const byte LDAC3 = 5;
 const byte gate_pin[MAX_VOICES] = {6, 7, 8, 9}; //DIGITAL BOARD OUT W, X, Y, Z
-bool gate_state[MAX_VOICES];
 //DIP0: MIDI on/off (for new sketch upload)
 const byte DIP_pin[DIPS] = {10, 11, 12}; //UNUSED
-bool DIP_state[DIPS];  //UNUSED
+bool DIP_state[DIPS];
+bool gate_state[MAX_VOICES];
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -70,6 +70,7 @@ int velVal;
 int kbtVal;
 int ATVoltage;
 bool sustain;
+bool firstCount;
 
 byte noteMem[MAX_VOICES];
 bool busy[MAX_VOICES];
@@ -173,19 +174,34 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
       case 0:
         //do nothing (not going to happen on "note on" signal)
       break;
-      case 1: //first key press - note allocated to 2x voices (not ALL voices or the volume drop during reallocation will be sensible)
-        AllocVoice(note, true); //we reserve only one slot to voice2
-        AllocVoice(note, false);
+      case 1: //first key press - note allocated to 2x voices (not more voices or the volume drop during reallocation will be sensible)
+      firstCount=!firstCount; //this is to allow a decent release to two adiacent notes when playing a single note at a time
+      if(firstCount == 0){
+        AllocVoice(note);
+        AllocVoice(note);
+      }
+      else{
+        busy[0] = true;
+        busy[1] = true;
+        AllocVoice(note);
+        AllocVoice(note);
+        busy[0] = false;
+        busy[1] = false;
+      }
       break;
       case 2: //new note allocated to 2x voices
-        AllocVoice(note, true); //we reserve only one slot to voice2
-        AllocVoice(note, false);
+        AllocVoice(note);
+        AllocVoice(note);
       break;
-      case 3:  //third voice allocated to 1x voice
-        AllocVoice(note, true); //we reserve one slot to voice3
+      case 3:  //third voice allocated to 2x voice
+        FreeVoice(); //go, find a doubled voice and free it
+        AllocVoice(note);
+        FreeVoice(); //go, find another doubled voice and free it
+        AllocVoice(note);
       break;
       case 4: //fourth voice allocated to 1x voice
-        AllocVoice(note, true); //we reserve one slot to voice3
+        FreeVoice(); //go, find a doubled voice and free it
+        AllocVoice(note);
         NoteHighest();
       break;
       default: //POLYPHONY EXCEEDED (MAX_VOICES+ notes)
@@ -222,13 +238,24 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
   }
 }
 
-void AllocVoice(byte n, bool b){
+void AllocVoice(byte n){
   for (int a = 0; a< MAX_VOICES; a++){
     if(busy[a] == false){
       noteMem[a] = n;
-      busy[a] = b;
+      busy[a] = true;
       digitalWrite(gate_pin[a], HIGH);
       return;
+    }
+  }
+}
+
+void FreeVoice(){
+  for (int a = 0; a< MAX_VOICES; a++){
+    for (int b = 0; b< MAX_VOICES-1; b++){
+      if(a != b && noteMem[a] == noteMem[b]){
+        busy[a] = false;
+        return;
+      }
     }
   }
 }
